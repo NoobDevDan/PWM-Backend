@@ -1,27 +1,28 @@
-import { readFile } from "node:fs/promises";
-import { createServer } from "node:https";
+const {Server} = require("socket.io");
+const http = require('node:http');
 
-const key = await readFile("./key.pem");
-const cert = await readFile("./cert.pem");
-
-const httpsServer = createServer({
-  key,
-  cert
-}, async (req, res) => {
-  if (req.method === "GET" && req.url === "/") {
-    const content = await readFile("./index.html");
-    res.writeHead(200, {
-      "content-type": "text/html"
-    });
-    res.write(content);
-    res.end();
-  } else {
-    res.writeHead(404).end();
-  }
+const httpServer = http.createServer((req, res) => {
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'text/plain');
+  res.end('Hello World\n');
 });
 
 const port = process.env.PORT || 3000;
 
-httpsServer.listen(port, () => {
-  console.log(`server listening at https://localhost:${port}`);
+httpServer.listen(port, () => {
+  console.log(`server listening at http://localhost:${port}`);
+});
+
+const io = new Server(httpServer);
+
+io.on("connection", (socket) => {
+  console.log(`connected with transport ${socket.conn.transport.name}`);
+
+  socket.conn.on("upgrade", (transport) => {
+    console.log(`transport upgraded to ${transport.name}`);
+  });
+
+  socket.on("disconnect", (reason) => {
+    console.log(`disconnected due to ${reason}`);
+  });
 });
