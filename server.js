@@ -1,6 +1,8 @@
 import  http  from "node:http";
 import { Server } from "socket.io";
 
+const whitelist = ['https://pokerinthebum.azurewebsite.net'];
+
 const httpServer = http.createServer((req, res) => {
   if (req.method === "GET" && req.url === "/") {
     res.writeHead(200, {
@@ -22,7 +24,7 @@ httpServer.listen(port, () => {
 const io = new Server(httpServer, {
   cors: {
     origin: function (origin, callback){
-      if(origin && origin.substring(0,16) === 'http://localhost'){
+      if(origin && origin.substring(0,16) === 'http://localhost' || whitelist.includes(origin)){
         callback(null, true);
       }
 
