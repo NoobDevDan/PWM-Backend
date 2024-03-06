@@ -22,6 +22,7 @@ httpServer.listen(port, () => {
 });
 
 const io = new Server(httpServer, {
+  perMessageDeflate: false,
   cors: {
     origin: function (origin, callback){
       if(origin && origin.substring(0,16) === 'http://localhost' || whitelist.includes(origin)){
