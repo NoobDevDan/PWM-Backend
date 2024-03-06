@@ -22,7 +22,7 @@ httpServer.listen(port, () => {
 const io = new Server(httpServer, {
   cors: {
     origin: function (origin, callback){
-      if(origin.substring(0,16) === 'http://localhost'){
+      if(origin && origin.substring(0,16) === 'http://localhost'){
         callback(null, true);
       }
 
@@ -43,4 +43,9 @@ io.on("connection", (socket) => {
   socket.on("disconnect", (reason) => {
     console.log(`disconnected due to ${reason}`);
   });
+
+  socket.on("message", (message, callback) => {
+    console.log(message);
+    callback("ok");
+  })
 });
