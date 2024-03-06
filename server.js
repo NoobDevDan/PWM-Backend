@@ -51,3 +51,7 @@ io.on("connection", (socket) => {
     callback("ok");
   })
 });
+
+io.on("ping", (respond) => {
+  respond("ack");
+})
