@@ -19,6 +19,8 @@
   },
   "homepage": "https://github.com/NoobDevDan/PWM-Backend#readme",
   "dependencies": {
+    "@fails-components/webtransport": "^1.0.10",
+    "@fails-components/webtransport-transport-http3-quiche": "^1.0.10",
     "socket.io": "^4.7.4"
   }
 }

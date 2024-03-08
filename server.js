@@ -1,6 +1,7 @@
 import {createServer} from "node:https";
 import { readFile } from "node:fs/promises";
 import { Server } from "socket.io";
+import { Http3Server } from "@fails-components/webtransport";
 
 const key = process.env.NODE_ENV == 'production' ? await readFile(process.env.SSL_KEY) : await readFile('./key.pem');
 const cert = process.env.NODE_ENV == 'production' ? await readFile(process.env.SSL_CERT) : await readFile('./cert.pem');
@@ -24,10 +25,11 @@ httpsServer.listen(port, () => {
 });
 
 const io = new Server(httpsServer, {
+  transports: ["polling", "websocket", "webtransport"],
   perMessageDeflate: false,
   cors: {
     origin: function (origin, callback){
-      if(origin && (origin.substring(0,16) === 'http://localhost' || origin.substring(0,17) === 'https://localhost')){
+      if(origin && (origin.includes('://localhost') || origin.includes('127.0.0.1'))){
         callback(null, true);
       }
 
@@ -58,3 +60,26 @@ io.on("connection", (socket) => {
 io.on("ping", (respond) => {
   respond("ack");
 })
+
+const h3Server = new Http3Server({
+  port,
+  host: "0.0.0.0",
+  secret: "changeit",
+  cert,
+  privKey: key,
+});
+
+h3Server.startServer();
+
+(async () => {
+  const stream = await h3Server.sessionStream("/socket.io/");
+  const sessionReader = stream.getReader();
+
+  while (true) {
+    const { done, value } = await sessionReader.read();
+    if (done) {
+      break;
+    }
+    io.engine.onWebTransportSession(value);
+  }
+})();
