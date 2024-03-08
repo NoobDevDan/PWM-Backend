@@ -1,9 +1,11 @@
-import  http  from "node:http";
+import {createServer} from "node:https";
+import { readFile } from "node:fs/promises";
 import { Server } from "socket.io";
 
-const whitelist = ['https://pokerinthebum.azurewebsite.net'];
+const key = process.env.NODE_ENV == 'production' ? await readFile(process.env.SSL_KEY) : await readFile('./key.pem');
+const cert = process.env.NODE_ENV == 'production' ? await readFile(process.env.SSL_CERT) : await readFile('./cert.pem');
 
-const httpServer = http.createServer((req, res) => {
+const httpsServer = createServer({key,cert},async (req, res) => {
   if (req.method === "GET" && req.url === "/") {
     res.writeHead(200, {
       "content-type": "text/html"
@@ -17,15 +19,15 @@ const httpServer = http.createServer((req, res) => {
 
 const port = process.env.PORT || 3001;
 
-httpServer.listen(port, () => {
-  console.log(`server listening at http://localhost:${port}`);
+httpsServer.listen(port, () => {
+  console.log(`server listening at https://localhost:${port}`);
 });
 
-const io = new Server(httpServer, {
+const io = new Server(httpsServer, {
   perMessageDeflate: false,
   cors: {
     origin: function (origin, callback){
-      if(origin && origin.substring(0,16) === 'http://localhost' || whitelist.includes(origin)){
+      if(origin && (origin.substring(0,16) === 'http://localhost' || origin.substring(0,17) === 'https://localhost')){
         callback(null, true);
       }
 
