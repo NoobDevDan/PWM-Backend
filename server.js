@@ -73,8 +73,10 @@ io.on("connection", (socket) => {
   });
 
   socket.on("message", (message, callback) => {
-    log(`${socket.id} : ${message}`);
-    callback("ok");
+    log(message);
+    log(`${socket.id} : ${message.text}`);
+    socket.broadcast.emit("message", message);
+    callback('received');
   });
 
   socket.on("drawHand", async (callback) => {
