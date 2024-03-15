@@ -1,31 +1,52 @@
-import {createServer} from "node:https";
-import { readFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { Server } from "socket.io";
-import { Http3Server } from "@fails-components/webtransport";
+import  Deck  from "./deck.js";
+import { log } from "node:console";
 
-const key = process.env.NODE_ENV == 'production' ? await readFile(process.env.SSL_KEY) : await readFile('./key.pem');
-const cert = process.env.NODE_ENV == 'production' ? await readFile(process.env.SSL_CERT) : await readFile('./cert.pem');
+var deck;
+var flop;
+var turn;
+var river
+var currentPlayers;
+var numberOfPlayers;
+var currentPlayer;
+var currentPot;
 
-const httpsServer = createServer({key,cert},async (req, res) => {
-  if (req.method === "GET" && req.url === "/") {
+async function newGame() {
+  deck = await Deck.getNewDeck();
+  log('deck ready: ' + deck.remaining + ' cards remaining');
+  flop = await deck.drawCards(3);
+  log('flop ready');
+  turn = (await deck.drawCards(1))[0]; //drawCards always returns an array even for 1 card
+  log('turn ready');
+  river = (await deck.drawCards(1))[0];
+  log('river ready');
+  currentPlayers = [];
+  numberOfPlayers = 0;
+  currentPlayer = '';
+  currentPot = 0;
+}
+
+const port = process.env.PORT || 3001;
+
+const server = createServer(async (req, res) => {
+  if (req.method === "GET" && req.url === "/is-https") {
     res.writeHead(200, {
       "content-type": "text/html"
     });
-    res.write("connected");
+    res.write("false");
     res.end();
   } else {
     res.writeHead(404).end();
   }
 });
 
-const port = process.env.PORT || 3001;
 
-httpsServer.listen(port, () => {
+server.listen(port, () => {
   console.log(`server listening at https://localhost:${port}`);
 });
 
-const io = new Server(httpsServer, {
-  transports: ["polling", "websocket", "webtransport"],
+const io = new Server(server, {
   perMessageDeflate: false,
   cors: {
     origin: function (origin, callback){
@@ -41,45 +62,51 @@ const io = new Server(httpsServer, {
 });
 
 io.on("connection", (socket) => {
-  console.log(`connected with transport ${socket.conn.transport.name}`);
+  log(`connected with transport ${socket.conn.transport.name}`);
 
   socket.conn.on("upgrade", (transport) => {
-    console.log(`connection upgraded to ${transport.name}`);
+    log(`${socket.id} connection upgraded to ${transport.name}`);
   });
 
   socket.on("disconnect", (reason) => {
-    console.log(`disconnected due to ${reason}`);
+    log(`${socket.id} disconnected due to ${reason}`);
   });
 
   socket.on("message", (message, callback) => {
-    console.log(message);
+    log(`${socket.id} : ${message}`);
     callback("ok");
-  })
+  });
+
+  socket.on("drawHand", async (callback) => {
+    log(`${socket.id} called drawHand`);
+    const hand = await deck.drawCards(2);
+    callback(hand);
+  });
+
+  socket.on("getFlop", (callback) => {
+    log(`${socket.id} called getFlop`);
+    callback(flop);
+  });
+
+  socket.on("getTurn", (callback) => {
+    log(`${socket.id} called getTurn`);
+    callback(turn);
+  });
+
+  socket.on("getRiver", (callback) => {
+    log(`${socket.id} called getRiver`);
+    callback(river);
+  });
+
+  socket.on("newGame", async (callback) => {
+    await newGame();
+    log('new game started');
+    callback("New game started");
+  });
 });
 
 io.on("ping", (respond) => {
   respond("ack");
-})
-
-const h3Server = new Http3Server({
-  port,
-  host: "0.0.0.0",
-  secret: "changeit",
-  cert,
-  privKey: key,
 });
 
-h3Server.startServer();
-
-(async () => {
-  const stream = await h3Server.sessionStream("/socket.io/");
-  const sessionReader = stream.getReader();
-
-  while (true) {
-    const { done, value } = await sessionReader.read();
-    if (done) {
-      break;
-    }
-    io.engine.onWebTransportSession(value);
-  }
-})();
+newGame();
