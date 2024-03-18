@@ -1,31 +1,11 @@
 import { createServer } from "node:http";
 import { Server } from "socket.io";
-import  Deck  from "./deck.js";
+import Player from "./objects/player.js"
+import Game from "./objects/game.js"
 import { log } from "node:console";
 
-var deck;
-var flop;
-var turn;
-var river
-var currentPlayers;
-var numberOfPlayers;
-var currentPlayer;
-var currentPot;
-
-async function newGame() {
-  deck = await Deck.getNewDeck();
-  log('deck ready: ' + deck.remaining + ' cards remaining');
-  flop = await deck.drawCards(3);
-  log('flop ready');
-  turn = (await deck.drawCards(1))[0]; //drawCards always returns an array even for 1 card
-  log('turn ready');
-  river = (await deck.drawCards(1))[0];
-  log('river ready');
-  currentPlayers = [];
-  numberOfPlayers = 0;
-  currentPlayer = '';
-  currentPot = 0;
-}
+var game = new Game();
+var chips = 5000;
 
 const port = process.env.PORT || 3001;
 
@@ -40,7 +20,6 @@ const server = createServer(async (req, res) => {
     res.writeHead(404).end();
   }
 });
-
 
 server.listen(port, () => {
   console.log(`server listening at https://localhost:${port}`);
@@ -74,36 +53,40 @@ io.on("connection", (socket) => {
 
   socket.on("message", (message, callback) => {
     log(message);
-    log(`${socket.id} : ${message.text}`);
     socket.broadcast.emit("message", message);
     callback('received');
   });
 
-  socket.on("drawHand", async (callback) => {
-    log(`${socket.id} called drawHand`);
-    const hand = await deck.drawCards(2);
+  socket.on("joinGame", ({playerId, playerName}, callback) => {
+    var newPlayer = new Player(playerId, playerName, chips)
+    callback(game.addPlayer(newPlayer)? 'joined' : 'error');
+  })
+
+  socket.on("drawHand", (playerId, callback) => {
+    log(`${playerId} called drawHand`);
+    const hand = game.getJoinedPlayer(playerId).currentHand; 
     callback(hand);
   });
 
   socket.on("getFlop", (callback) => {
     log(`${socket.id} called getFlop`);
-    callback(flop);
+    callback(game.flop);
   });
 
   socket.on("getTurn", (callback) => {
     log(`${socket.id} called getTurn`);
-    callback(turn);
+    callback(game.turn);
   });
 
   socket.on("getRiver", (callback) => {
     log(`${socket.id} called getRiver`);
-    callback(river);
+    callback(game.river);
   });
 
-  socket.on("newGame", async (callback) => {
-    await newGame();
-    log('new game started');
-    callback("New game started");
+  socket.on("resetGame", async (callback) => {
+    await game.reset();
+    log('game has been reset');
+    callback("Game Reset");
   });
 });
 
@@ -111,4 +94,4 @@ io.on("ping", (respond) => {
   respond("ack");
 });
 
-newGame();
+
