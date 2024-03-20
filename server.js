@@ -1,44 +1,34 @@
-import { createServer } from "node:http";
-import { Server } from "socket.io";
+import socketServer from "./utils/socketServer.js";
 import Player from "./objects/player.js"
-import Game from "./objects/game.js"
+import  Game  from "./objects/game.js"
 import { log } from "node:console";
 
-var game = new Game();
-var chips = 5000;
+export const io = socketServer();
 
-const port = process.env.PORT || 3001;
+var game = new Game;
 
-const server = createServer(async (req, res) => {
-  if (req.method === "GET" && req.url === "/is-https") {
-    res.writeHead(200, {
-      "content-type": "text/html"
+function broadcastPlayersOnline(){
+  const onlinePlayers = game.playersJoined.map((player) => {
+    return({
+      id: player.id,
+      name: player.name,
+      chipCount: player.chipCount,
+      status: player.status,
+      lastAction: player.lastAction,
+      lastBid: player.lastBid,
+      avatarURL: player.avatarURL,
     });
-    res.write("false");
-    res.end();
-  } else {
-    res.writeHead(404).end();
-  }
-});
+  })
+  io.emit("playerJoined", onlinePlayers);
+}
 
-server.listen(port, () => {
-  console.log(`server listening at https://localhost:${port}`);
-});
+function broadcastNewRound(){
+  io.emit("newRound", game.currentRound);
+}
 
-const io = new Server(server, {
-  perMessageDeflate: false,
-  cors: {
-    origin: function (origin, callback){
-      if(origin && (origin.includes('://localhost') || origin.includes('127.0.0.1'))){
-        callback(null, true);
-      }
-
-      else{
-        callback(new Error('Not allowed by CORS'), false);
-      }
-    }
-  }
-});
+function broadcastPlayersUpdated(){
+  io.emit("playersUpdated");
+}
 
 io.on("connection", (socket) => {
   log(`connected with transport ${socket.conn.transport.name}`);
@@ -52,46 +42,83 @@ io.on("connection", (socket) => {
   });
 
   socket.on("message", (message, callback) => {
+    if(message.text.includes("admin:reset")){
+      game.reset();
+      io.emit("reset");
+    }
     log(message);
-    socket.broadcast.emit("message", message);
+    io.emit("message", message);
     callback('received');
   });
 
-  socket.on("joinGame", ({playerId, playerName}, callback) => {
-    var newPlayer = new Player(playerId, playerName, chips)
+  socket.on("joinGame", (player, callback) => {
+    log(player);
+    log(game.getJoinedPlayer(player.id));
+    var newPlayer = new Player(player.id, player.name, player.avatarURL);
     callback(game.addPlayer(newPlayer)? 'joined' : 'error');
+    broadcastPlayersOnline();
   })
 
-  socket.on("drawHand", (playerId, callback) => {
-    log(`${playerId} called drawHand`);
-    const hand = game.getJoinedPlayer(playerId).currentHand; 
+  socket.on("startGame", () => {
+    log("startGame Called");
+    if(!game.gameStarted){
+      game.start();
+      io.emit("gameStarted");
+      //broadcastPlayersUpdated();
+    }
+  })
+
+  socket.on("newRound", async(callback) => {
+    if(game.gameStarted){
+      await (game.newRound());
+      broadcastPlayersUpdated();
+      broadcastNewRound();
+      callback(`round ${game.currentRound} started`)
+    }
+
+    callback('Game not started');
+  })
+
+  socket.on("getHand", (playerId, callback) => {
+    log(`${playerId} called getHand`);
+    let player = game.getJoinedPlayer(playerId);
+    log(player);
+    const hand = player.currentHand;
+    log(hand)
     callback(hand);
   });
 
   socket.on("getFlop", (callback) => {
     log(`${socket.id} called getFlop`);
-    callback(game.flop);
+    if(game.currentRound == 1){
+      log(game.flop);
+      io.emit("setFlop", game.flop);
+    }
   });
 
   socket.on("getTurn", (callback) => {
     log(`${socket.id} called getTurn`);
-    callback(game.turn);
+    if(game.currentRound == 2){
+      log(game.turn);
+      io.emit("setTurn", game.turn);
+    }
   });
 
   socket.on("getRiver", (callback) => {
     log(`${socket.id} called getRiver`);
-    callback(game.river);
+    if(game.currentRound == 3){
+      log(game.river);
+      io.emit("setRiver", game.river);
+    }
   });
 
-  socket.on("resetGame", async (callback) => {
-    await game.reset();
-    log('game has been reset');
-    callback("Game Reset");
+  socket.on("updatePlayer",  (playerId, callback) => {
+    log(`${playerId} called updatePlayer`);
+    let player = game.getJoinedPlayer(playerId);
+    callback(player);
   });
 });
 
-io.on("ping", (respond) => {
-  respond("ack");
-});
+
 
 

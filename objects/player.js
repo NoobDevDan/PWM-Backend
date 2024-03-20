@@ -1,27 +1,53 @@
 
 class Player { 
-    constructor(_playerId, _playerName, _chipCount){
-        this.playerId = _playerId; //will be auth id most likely
-        this.playerName = _playerName; //display name
-        this.chipCount = _chipCount; //current chips value
-        this.currentHand = null; //array of 2 cardsthis.bestHand = {rank: 0, cards: []}; //rank and array of best cards so far. format: {rank: 10, ["AH","KH","QH","JH","10H"]}
-        this.isActive = false;
+    constructor(_playerId, _playerName, _avatarURL, _chipCount){
+        this.id = _playerId; //will be auth id most likely
+        this.name = _playerName; //display name
+        this.chipCount = 5000; //current chips value
+        this.currentHand = null; //array of 2 cards
+        this.status = 'Spectating'; //[Spectating, Folded, Broke AF, Playing]
+        this.lastAction = null; // [Checked, Called, Raised, All-in]
+        this.lastBid = null; //0=Checked, otherwise amount of chips to pot
+        this.avatarURL = _avatarURL; //URL to player profile pic
     }
 
-    async setHand(){
-        this.currentHand = (await deck.drawCards(2));
+    reset(){
+        this.chipCount = 5000;
+        this.currentHand = null;
+        this.status = 'Spectating';
+        this.lastAction = null;
+        this.lastBid = null;
+        return this;
+    }
+
+    setHand(hand){
+        this.currentHand = hand;
+        return this;
     }
 
     decreaseChipCount(chipValue){
         this.chipCount -= chipValue;
+        return this;
     }
 
     increaseChipCound(chipValue){
         this.chipCount += chipValue;
+        return this;
     }
 
-    setIsActive(boolValue){
-        this.isActive = boolValue;
+    setStatus(stringVal){
+        this.status = stringVal;
+        return this;
+    }
+
+    setLastAction(stringVal){
+        this.lastAction = stringVal;
+        return this;
+    }
+
+    setLastBid(numVal){
+        this.lastBid = numVal;
+        return this;
     }
 }
 

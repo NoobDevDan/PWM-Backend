@@ -1,36 +1,71 @@
-import  Deck  from "./deck.js";
+import  Deck   from "./deck.js";
+import { log } from "node:console";
 
 class Game{
     constructor(){
-        this.deck = null;
+        this.deck = new Deck();
         this.flop = null;
         this.turn = null;
         this.river = null;
         this.currentPlayer = null;
         this.currentPot = null;
         this.gameStarted = false;
-        this.roundStarted = false;
+        this.currentRound = -1;
         this.playersJoined = [];
         this.error = "";
     }
 
     async reset(){
-        this.deck = await Deck.newDeck();
+        this.deck = await (this.deck.newDeck());
         this.currentPlayer = null;
         this.currentPot = null;
         this.gameStarted = false;
-        this.roundStarted = false;
+        this.currentRound = -1;
+        this.flop = null;
+        this.turn = null;
+        this.river = null;
+        this.playersJoined((player) => {
+            return player.reset();
+        })
+        return this;
     }
 
     async newRound(){
-        if(this.gameStarted && !this.roundStarted){
-            this.flop = await deck.drawCards(3);
-            this.turn = (await deck.drawCards(1))[0]; //drawCards always returns an array even for 1 card
-            this.river = (await deck.drawCards(1))[0];
-            this.roundStarted = true;
-            this.playersJoined.map(async player => {
-                await player.drawHand();
-            });
+        if(this.gameStarted){
+            this.currentRound += 1;
+            switch(this.currentRound){
+                case 0:
+                    if(this.deck.remaining < 52){this.deck = await (this.deck.newDeck())};
+
+                    // Use Promise.all to wait for all promises to resolve
+                    this.playersJoined = await Promise.all(this.playersJoined.map(async (player) => {
+                        if(player.status == 'Playing'){
+                            // Assuming drawCards is an async function and returns a promise
+                            const currentHand = await this.deck.drawCards(2);
+                            return { ...player, currentHand: currentHand };
+                        }
+                        else{
+                            return player;
+                        }
+                    }));
+                    return this;
+                case 1:
+                    this.flop = await (this.deck.drawCards(3));
+                    return this;
+                case 2: 
+                    this.turn = (await this.deck.drawCards(1))[0];
+                    return this;
+                case 3: 
+                    this.river = (await this.deck.drawCards(1))[0];
+                    return this;
+                default:
+                    this.currentRound = -1;
+                    this.flop = null;
+                    this.turn = null;
+                    this.river = null;
+                    await (this.newRound());
+                    return this;
+            }
         }
 
         else{
@@ -38,26 +73,29 @@ class Game{
         }
     }
 
-    async start(){
-        this.Deck =  await Deck.newDeck();
+    start(){
         this.gameStarted = true;
-        this.newRound();
+        this.playersJoined = this.playersJoined.map((player) => {
+            player.setStatus('Playing');
+            return player;
+        })
+        return this;
     }
 
     addPlayer(player){
-        if(!this.getJoinedPlayer(player.playerId)){
-            this.playersJoined.push(player);
-            return true
+        if(this.getJoinedPlayer(player.id)){
+            console.warn("WARN: Player is already in playersJoined")
+            return false;
         }
         else{
-            console.warn("WARN: Player is already in playersJoined")
-            return false
+            this.playersJoined.push(player);
+            return true
         }
     }
 
     getJoinedPlayer(playerId){
-        return this.playersJoined.find((player) => player.playerId == playerId);
+        return this.playersJoined.find((player) => player.id == playerId);
     }
 }
 
-export default Game;
+export default await Game;
