@@ -1,4 +1,5 @@
 import  Deck   from "./deck.js";
+import Player from "./player.js";
 import { log } from "node:console";
 
 class Game{
@@ -7,25 +8,35 @@ class Game{
         this.flop = null;
         this.turn = null;
         this.river = null;
-        this.currentPlayer = null;
+        this.indexOfCurrentPlayer = -2;
         this.currentPot = null;
         this.gameStarted = false;
+        this.minimumBet = 50;
         this.currentRound = -1;
         this.playersJoined = [];
-        this.error = "";
+        this.bigBlind = 50;
+        this.smallBlind = 25;
+        this.smallBlindPlayerId = null;
+        this.bigBlindPlayerId = null;
     }
 
     async reset(){
         this.deck = await (this.deck.newDeck());
-        this.currentPlayer = null;
+        this.indexOfCurrentPlayer = null;
         this.currentPot = null;
         this.gameStarted = false;
-        this.currentRound = -1;
+        this.currentRound = -2;
+        this.minimumBet = 50;
         this.flop = null;
         this.turn = null;
         this.river = null;
-        this.playersJoined((player) => {
-            return player.reset();
+        this.bigBlind = 50;
+        this.smallBlind = 25;
+        this.smallBlindPlayerId = null;
+        this.bigBlindPlayerId = null;
+        this.playersJoined = this.playersJoined.map((player) => {
+            let resetPlayer = player.reset();
+            return resetPlayer;
         })
         return this;
     }
@@ -63,6 +74,9 @@ class Game{
                     this.flop = null;
                     this.turn = null;
                     this.river = null;
+                    this.smallBlind = this.smallBlind * 2;
+                    this.bigBlind = this.bigBlind * 2;
+                    this.indexOfCurrentPlayer = 0;
                     await (this.newRound());
                     return this;
             }
@@ -76,9 +90,9 @@ class Game{
     start(){
         this.gameStarted = true;
         this.playersJoined = this.playersJoined.map((player) => {
-            player.setStatus('Playing');
-            return player;
-        })
+            return{...player, status:'Playing'};
+        });
+        this.indexOfCurrentPlayer = 0;
         return this;
     }
 

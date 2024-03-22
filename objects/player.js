@@ -1,13 +1,13 @@
 
 class Player { 
-    constructor(_playerId, _playerName, _avatarURL, _chipCount){
+    constructor(_playerId, _playerName, _avatarURL){
         this.id = _playerId; //will be auth id most likely
         this.name = _playerName; //display name
         this.chipCount = 5000; //current chips value
         this.currentHand = null; //array of 2 cards
         this.status = 'Spectating'; //[Spectating, Folded, Broke AF, Playing]
         this.lastAction = null; // [Checked, Called, Raised, All-in]
-        this.lastBid = null; //0=Checked, otherwise amount of chips to pot
+        this.amountBidThisRound = 0; //amount of chips committed to the pot this round
         this.avatarURL = _avatarURL; //URL to player profile pic
     }
 
@@ -15,8 +15,7 @@ class Player {
         this.chipCount = 5000;
         this.currentHand = null;
         this.status = 'Spectating';
-        this.lastAction = null;
-        this.lastBid = null;
+        this.amountBidThisRound = 0;
         return this;
     }
 
@@ -45,8 +44,8 @@ class Player {
         return this;
     }
 
-    setLastBid(numVal){
-        this.lastBid = numVal;
+    setAmountBidThisRound(numVal){
+        this.amountBidThisRound = numVal;
         return this;
     }
 }
