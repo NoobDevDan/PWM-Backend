@@ -1,3 +1,4 @@
+import { game } from "../server.js";
 
 class Player { 
     constructor(_playerId, _playerName, _avatarURL){
@@ -5,8 +6,8 @@ class Player {
         this.name = _playerName; //display name
         this.chipCount = 5000; //current chips value
         this.currentHand = null; //array of 2 cards
-        this.status = 'Spectating'; //[Spectating, Folded, Broke AF, Playing]
-        this.lastAction = null; // [Checked, Called, Raised, All-in]
+        this.status = 'Inactive'; //[Folded, Inactive, Playing]
+        this.lastAction = null; // [Checked, Bet, Called, Raised, All-in, Folded]
         this.amountBidThisRound = 0; //amount of chips committed to the pot this round
         this.avatarURL = _avatarURL; //URL to player profile pic
     }
@@ -14,39 +15,40 @@ class Player {
     reset(){
         this.chipCount = 5000;
         this.currentHand = null;
-        this.status = 'Spectating';
+        this.status = 'Inactive';
         this.amountBidThisRound = 0;
         return this;
     }
 
-    setHand(hand){
+    async getHand(){
+        let hand = await (game.deck.drawCards(2));
         this.currentHand = hand;
-        return this;
+        return this.currentHand;
     }
 
     decreaseChipCount(chipValue){
         this.chipCount -= chipValue;
-        return this;
+        return this.chipCount;
     }
 
     increaseChipCound(chipValue){
         this.chipCount += chipValue;
-        return this;
+        return this.chipCount;
     }
 
     setStatus(stringVal){
         this.status = stringVal;
-        return this;
+        return this.status;
     }
 
     setLastAction(stringVal){
         this.lastAction = stringVal;
-        return this;
+        return this.lastAction;
     }
 
     setAmountBidThisRound(numVal){
         this.amountBidThisRound = numVal;
-        return this;
+        return this.amountBidThisRound;
     }
 }
 

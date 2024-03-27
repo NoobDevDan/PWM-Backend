@@ -5,46 +5,70 @@ import { log } from "node:console";
 import Helper from "./utils/helper.js";
 
 export const io = socketServer();
-var game = new Game;
+export var game = new Game;
 var helper = new Helper;
 
 
 ///
 //game event handlers
 ///
-function transactionEventHandler(playerId, eventType, transactionAmount){
-  switch(eventType){
+function actionEventHandler(playerId, actionType, actionAmount){
+  const _player = game.getOnlinePlayer(playerId);
+  switch(actionType){
     case "Fold":
-      break;
+      _player.lastAction = 'Folded';
+      _player.status = 'Folded';
+      game.onlinePlayers = game.onlinePlayers.map((player) => (player.id == playerId ? {...player, ..._player} : player));
+      return true;
     case "Check":
-      break;
+      _player.lastAction = 'Checked';
+      game.onlinePlayers = game.onlinePlayers.map((player) => (player.id == playerId ? {...player, ..._player} : player));
+      return true;
+    case "Bet":
+      _player.amountBidThisRound += actionAmount;
+      _player.lastAction = 'Bet';
+      game.onlinePlayers = game.onlinePlayers.map((player) => (player.id === playerId ? {...player, ..._player} : player));
+      game.currentPot += actionAmount;
+      return true;
     case "Call":
-      break;
+      _player.amountBidThisRound += actionAmount;
+      _player.lastAction = 'Called';
+      game.onlinePlayers = game.onlinePlayers.map((player) => (player.id === playerId ? {...player, ..._player} : player));
+      game.currentPot += actionAmount;
+      return true;
     case "Raise":
-      break;
+      _player.amountBidThisRound += actionAmount;
+      _player.lastAction = 'Raise';
+      game.onlinePlayers = game.onlinePlayers.map((player) => (player.id === playerId ? {...player, ..._player} : player));
+      game.currentPot += actionAmount;
+      return true;
     case "All-in":
-      break;
+      _player.amountBidThisRound += actionAmount;
+      _player.lastAction = 'All-in';
+      game.onlinePlayers = game.onlinePlayers.map((player) => (player.id === playerId ? {...player, ..._player} : player));
+      game.currentPot += actionAmount;
+      return true;
     default:
-      log(`WARN: ${eventType} does not exist`)
+      log(`WARN: ${actionType} does not exist`);
+      return false;
   }
-
-  broadcastPlayersUpdated();
 }
 
 async function nextRound(){
-  await game.newRound();
+  await (game.newRound());
   broadcastStateOfPlay();
   broadcastPlayersUpdated();
 }
 
 function nextPlayer(){
-  if(game.indexOfCurrentPlayer < game.playersJoined.length){
+  log(game.indexOfCurrentPlayer);
+  log(game.onlinePlayers.length);
+  if(game.indexOfCurrentPlayer < game.onlinePlayers.length){
     game.indexOfCurrentPlayer += 1;
   }
   else{
     game.indexOfCurrentPlayer = 0;
   }
-  
 }
 
 
@@ -53,30 +77,30 @@ function nextPlayer(){
 ///
 function broadcastPlayersUpdated(){
   log('Broadcasting PlayersUpdated');
-  let onlinePlayers = game.playersJoined.map((player) => {
+  let onlinePlayers = game.onlinePlayers.map((player) => {
     let playerNoCards = helper.removeCardsFromPlayer(player);
     return playerNoCards;
-  })
+  });
   io.emit("playersUpdated", onlinePlayers);
 }
 
 function broadcastStateOfPlay(){
-  log('Broadcasting State of Play');
-  let SOP = {
-    currentRound: game.currentRound,
-    smallBlind: game.smallBlind,
-    bigBlind: game.bigBlind,
-    currentPot: game.currentPot,
-    currentPlayerId: game.playersJoined[game.indexOfCurrentPlayer].id,
-    smallBlindPlayerId: game.smallBlindPlayerId,
-    bigBlindPlayerId: game.bigBlindPlayerId,
-    minimumBet: game.minimumBet,
-    gameStarted: game.gameStarted,
+  if(game.gameStarted){
+    log('Broadcasting State of Play');
+    let SOP = {
+      currentRound: game.currentRound,
+      smallBlind: game.smallBlind,
+      bigBlind: game.bigBlind,
+      currentPot: game.currentPot,
+      currentPlayerId: game.onlinePlayers[game.indexOfCurrentPlayer].id,
+      smallBlindPlayerId: game.onlinePlayers[game.indexOfSmallBlindPlayer].id,
+      bigBlindPlayerId: game.onlinePlayers[game.indexOfBigBlindPlayer].id,
+      minimumBet: game.minimumBet,
+      gameStarted: game.gameStarted,
+    }
+    io.emit("stateOfPlay", SOP);
   }
-  io.emit("stateOfPlay", SOP);
 }
-
-
 
 ///
 //Socket connection event handling
@@ -92,15 +116,15 @@ io.on("connection", (socket) => {
     log(`${socket.id} disconnected due to ${reason}`);
   });
 
-  socket.on("message", async (message) => {
+  socket.on("message", (message) => {
     if(message.text.includes("admin:reset")){
       game.reset();
       io.emit("reset");
     }
-    if(message.text.includes("admin:nextRound")){
+    else if(message.text.includes("admin:nextRound")){
       nextRound();
     }
-    if(message.text.includes("admin:nextPlayer")){
+    else if(message.text.includes("admin:nextPlayer")){
       nextPlayer();
     }
     else{
@@ -110,10 +134,13 @@ io.on("connection", (socket) => {
   });
 
   socket.on("joinGame", (player, callback) => {
-    log(player.name + ' joined the game');
     var newPlayer = new Player(player.id, player.name, player.avatarURL);
-    callback(game.addPlayer(newPlayer)? 'joined' : 'error joining');
-    broadcastPlayersUpdated();
+    const success = game.addPlayer(newPlayer);
+    callback(success? 'joined' : 'error joining');
+    success ? console.log(`${newPlayer.name} has joined the game`) : console.log(`${newPlayer.name} has already joined`);
+    if(success){
+      broadcastPlayersUpdated();
+    }
   })
 
   socket.on("startGame", async() => {
@@ -129,11 +156,14 @@ io.on("connection", (socket) => {
       broadcastStateOfPlay();
   })
 
-  socket.on("getHand", (playerId, callback) => {
+  socket.on("getHand", async (playerId, callback) => {
     log(`${playerId} called getHand`);
-    let player = game.getJoinedPlayer(playerId);
-    const hand = player.currentHand;
-    callback(hand);
+    let _hand = await (game.deck.drawCards(2));
+    let _currentHand = {currentHand: _hand};
+    game.onlinePlayers = game.onlinePlayers.map((player) => playerId == player.id ? {...player, ..._currentHand} : player);
+    let player = game.getOnlinePlayer(playerId);
+    callback(player.currentHand);
+    return game.onlinePlayers;
   });
 
   socket.on("getFlop", () => {
@@ -157,16 +187,23 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("updatePlayer",  (playerId, callback) => {
-    log(`${playerId} called updatePlayer`);
-    let player = game.getJoinedPlayer(playerId);
-    let updatedPlayer = helper.removeCardsFromPlayer(player);
-    callback(updatedPlayer);
-  });
+  socket.on("actionEvent", async(playerId, actionType, actionAmount, callback) => {
+    log(`${playerId} has sent a ${actionType} actionEvent: ${actionAmount}`);
+    let success = actionEventHandler(playerId, actionType, actionAmount);
+    if(success){
+      let totalBidThisRound = 0; 
+      game.onlinePlayers.forEach((player) => {
+        totalBidThisRound += player.amountBidThisRound;
+      })
+      game.currentPot != totalBidThisRound ? nextPlayer() : await game.newRound();
+      broadcastPlayersUpdated();
+      broadcastStateOfPlay();
+      callback('success');
+    }
 
-  socket.on("transactionEvent", (playerId, eventType, transactionAmount) => {
-    log(`${playerId} has sent a ${eventType} transactionEvent`);
-    transactionEventHandler(playerId, eventType, transactionAmount);
+    else{
+      callback('action failed');
+    }
   });
 });
 

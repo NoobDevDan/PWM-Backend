@@ -1,5 +1,4 @@
 import  Deck   from "./deck.js";
-import Player from "./player.js";
 import { log } from "node:console";
 
 class Game{
@@ -9,21 +8,23 @@ class Game{
         this.turn = null;
         this.river = null;
         this.indexOfCurrentPlayer = -2;
-        this.currentPot = null;
+        this.indexOfSmallBlindPlayer = null;
+        this.indexOfBigBlindPlayer = null;
+        this.currentPot = 0;
         this.gameStarted = false;
         this.minimumBet = 50;
         this.currentRound = -1;
-        this.playersJoined = [];
+        this.onlinePlayers = [];
         this.bigBlind = 50;
         this.smallBlind = 25;
-        this.smallBlindPlayerId = null;
-        this.bigBlindPlayerId = null;
     }
 
     async reset(){
         this.deck = await (this.deck.newDeck());
         this.indexOfCurrentPlayer = null;
-        this.currentPot = null;
+        this.indexOfSmallBlindPlayer = null;
+        this.indexOfBigBlindPlayer = null;
+        this.currentPot = 0;
         this.gameStarted = false;
         this.currentRound = -2;
         this.minimumBet = 50;
@@ -32,9 +33,7 @@ class Game{
         this.river = null;
         this.bigBlind = 50;
         this.smallBlind = 25;
-        this.smallBlindPlayerId = null;
-        this.bigBlindPlayerId = null;
-        this.playersJoined = this.playersJoined.map((player) => {
+        this.onlinePlayers = this.playersJoined.map((player) => {
             let resetPlayer = player.reset();
             return resetPlayer;
         })
@@ -47,18 +46,20 @@ class Game{
             switch(this.currentRound){
                 case 0:
                     if(this.deck.remaining < 52){this.deck = await (this.deck.newDeck())};
+                    this.currentPot = this.bigBlind + this.smallBlind;
+                    this.onlinePlayers = this.onlinePlayers.map((player) => {
+                        if(player.id == this.onlinePlayers[this.indexOfBigBlindPlayer].id){
+                            let updates = {chipCount: player.chipCount -= this.bigBlind, amountBidThisRound: this.bigBlind};
+                            return {...player, ...updates};
+                        }
 
-                    // Use Promise.all to wait for all promises to resolve
-                    this.playersJoined = await Promise.all(this.playersJoined.map(async (player) => {
-                        if(player.status == 'Playing'){
-                            // Assuming drawCards is an async function and returns a promise
-                            const currentHand = await this.deck.drawCards(2);
-                            return { ...player, currentHand: currentHand };
+                        else if(player.id == this.onlinePlayers[this.indexOfSmallBlindPlayer].id){
+                            let updates = {chipCount: player.chipCount -= this.smallBlind, amountBidThisRound: this.smallBlind};
+                            return {...player, ...updates};
                         }
-                        else{
-                            return player;
-                        }
-                    }));
+
+                        return player;
+                    });
                     return this;
                 case 1:
                     this.flop = await (this.deck.drawCards(3));
@@ -77,6 +78,8 @@ class Game{
                     this.smallBlind = this.smallBlind * 2;
                     this.bigBlind = this.bigBlind * 2;
                     this.indexOfCurrentPlayer = 0;
+                    this.indexOfSmallBlindPlayer = this.playersJoined.length - 2;
+                    this.indexOfBigBlindPlayer = this.playersJoined.length - 1;
                     await (this.newRound());
                     return this;
             }
@@ -88,28 +91,36 @@ class Game{
     }
 
     start(){
-        this.gameStarted = true;
-        this.playersJoined = this.playersJoined.map((player) => {
-            return{...player, status:'Playing'};
-        });
-        this.indexOfCurrentPlayer = 0;
-        return this;
+        if(this.onlinePlayers.length > 1){
+            this.gameStarted = true;
+            this.onlinePlayers = this.onlinePlayers.map((player) => {
+                return{...player, status:'Playing'};
+            });
+            this.indexOfCurrentPlayer = 0;
+            this.indexOfSmallBlindPlayer = this.onlinePlayers.length - 2;
+            this.indexOfBigBlindPlayer = this.onlinePlayers.length - 1;
+            return this;
+        }
+
+        else{
+            log('WARN: Not Enough Players Online');
+        }
+        
     }
 
     addPlayer(player){
-        if(this.getJoinedPlayer(player.id)){
-            console.warn("WARN: Player is already in playersJoined")
+        if(this.getOnlinePlayer(player.id)){
             return false;
         }
         else{
-            this.playersJoined.push(player);
+            this.onlinePlayers.push(player);
             return true
         }
     }
 
-    getJoinedPlayer(playerId){
-        return this.playersJoined.find((player) => player.id == playerId);
+    getOnlinePlayer(playerId){
+        return this.onlinePlayers.find((player) => player.id == playerId);
     }
 }
 
-export default await Game;
+export default Game;
