@@ -1,3 +1,5 @@
+import Helper from "../utils/helper.js";
+
 class Deck {
     constructor(){
         this.deck = [];
@@ -10,6 +12,8 @@ class Deck {
         const data = await response.json();
         this.deck = data.cards;
         this.availableCards = this.shuffleDeck();
+        const helper = new Helper;
+        helper.rankHand(this.drawCards(5));
         return this;
     }
     

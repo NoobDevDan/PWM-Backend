@@ -8,7 +8,6 @@ export const io = socketServer();
 export var game = new Game;
 var helper = new Helper;
 
-
 ///
 //game event handlers
 ///
@@ -55,6 +54,9 @@ function actionEventHandler(playerId, actionType, actionAmount){
 }
 
 async function nextRound(){
+  log('nextRound called');
+  log(game.indexOfCurrentPlayer);
+  log(game.onlinePlayers.length);
   game.newRound();
   broadcastStateOfPlay();
   broadcastPlayersUpdated();
@@ -197,7 +199,7 @@ io.on("connection", (socket) => {
         totalBidThisRound += player.amountBidThisRound;
       })
       game.currentPot == totalBidThisRound && 
-              game.indexOfCurrentPlayer == game.onlinePlayers.length - 1  
+              game.indexOfCurrentPlayer == (game.onlinePlayers.length - 1)  
               ? game.newRound() : nextPlayer();
       broadcastPlayersUpdated();
       broadcastStateOfPlay();

@@ -41,7 +41,8 @@ class Game{
 
     newRound(){
         if(this.gameStarted){
-            this.currentRound.roundNumber += 1;
+            this.currentRound.roundNumber ++ ;
+            this.indexOfCurrentPlayer = 0;
             switch(this.currentRound.roundNumber){
                 case 0:
                     this.currentPot = this.bigBlind + this.smallBlind;
@@ -58,29 +59,36 @@ class Game{
 
                         return player;
                     });
+                    this.resetPlayerLastAction();
                     return this;
                 case 1:
                     this.flop = this.deck.drawCards(3);
+                    this.resetPlayerLastAction();
                     return this;
                 case 2: 
                     this.turn = this.deck.drawCards(1)[0];
+                    this.resetPlayerLastAction();
                     return this;
                 case 3: 
                     this.river = this.deck.drawCards(1)[0];
+                    this.resetPlayerLastAction();
                     return this;
                 default:
+                    this.whoWon();
                     this.currentRound.roundNumber = -1;
-                    this.currentRound.id += 1;
+                    this.currentRound.id ++ ;
                     this.flop = null;
                     this.turn = null;
                     this.river = null;
                     this.smallBlind = this.smallBlind * 2;
                     this.bigBlind = this.bigBlind * 2;
                     this.indexOfCurrentPlayer = 0;
-                    this.indexOfSmallBlindPlayer = this.playersJoined.length - 2;
-                    this.indexOfBigBlindPlayer = this.playersJoined.length - 1;
+                    this.indexOfSmallBlindPlayer = (this.onlinePlayers.length - 2);
+                    this.indexOfBigBlindPlayer = (this.onlinePlayers.length - 1);
                     this.deck.shuffleDeck();
                     this.newRound();
+                    this.resetPlayerStatus();
+                    this.resetPlayerLastAction();
                     return this;
             }
         }
@@ -120,6 +128,25 @@ class Game{
 
     getOnlinePlayer(playerId){
         return this.onlinePlayers.find((player) => player.id == playerId);
+    }
+
+    resetPlayerStatus(){
+        let updates = {lastAction: null, status: 'Playing'}
+        this.onlinePlayers = this.onlinePlayers.map((player) => 
+            player.status != 'Inactive' ? {...player, ...updates} : player
+        )
+        return this.onlinePlayers;
+    }
+
+    resetPlayerLastAction(){
+        this.onlinePlayers = this.onlinePlayers.map((player) => 
+            ['Folded', 'Inactive'].includes(player.status) ? player : {...player, lastAction: null}
+        )
+        return this.onlinePlayers;
+    }
+
+    whoWon(){
+        
     }
 }
 
