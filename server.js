@@ -55,7 +55,7 @@ function actionEventHandler(playerId, actionType, actionAmount){
 }
 
 async function nextRound(){
-  await (game.newRound());
+  game.newRound();
   broadcastStateOfPlay();
   broadcastPlayersUpdated();
 }
@@ -143,11 +143,11 @@ io.on("connection", (socket) => {
     }
   })
 
-  socket.on("startGame", async() => {
+  socket.on("startGame", () => {
     log("startGame Called");
     if(!game.gameStarted){
       game.start();
-      await nextRound();
+      nextRound();
     }
   })
 
@@ -156,9 +156,10 @@ io.on("connection", (socket) => {
       broadcastStateOfPlay();
   })
 
-  socket.on("getHand", async (playerId, callback) => {
+  socket.on("getHand", (playerId, callback) => {
     log(`${playerId} called getHand`);
-    let _hand = await (game.deck.drawCards(2));
+    let _hand = game.deck.drawCards(2);
+    log(_hand);
     let _currentHand = {currentHand: _hand};
     game.onlinePlayers = game.onlinePlayers.map((player) => playerId == player.id ? {...player, ..._currentHand} : player);
     let player = game.getOnlinePlayer(playerId);
@@ -168,26 +169,26 @@ io.on("connection", (socket) => {
 
   socket.on("getFlop", () => {
     log(`getFlop called`);
-    if(game.currentRound == 1){
+    if(game.currentRound.roundNumber == 1){
       io.emit("setFlop", game.flop);
     }
   });
 
   socket.on("getTurn", () => {
     log(`getTurn called`);
-    if(game.currentRound == 2){
+    if(game.currentRound.roundNumber == 2){
       io.emit("setTurn", game.turn);
     }
   });
 
   socket.on("getRiver", () => {
     log(`getRiver called`);
-    if(game.currentRound == 3){
+    if(game.currentRound.roundNumber == 3){
       io.emit("setRiver", game.river);
     }
   });
 
-  socket.on("actionEvent", async(playerId, actionType, actionAmount, callback) => {
+  socket.on("actionEvent", (playerId, actionType, actionAmount, callback) => {
     log(`${playerId} has sent a ${actionType} actionEvent: ${actionAmount}`);
     let success = actionEventHandler(playerId, actionType, actionAmount);
     if(success){
@@ -195,7 +196,9 @@ io.on("connection", (socket) => {
       game.onlinePlayers.forEach((player) => {
         totalBidThisRound += player.amountBidThisRound;
       })
-      game.currentPot != totalBidThisRound ? nextPlayer() : await game.newRound();
+      game.currentPot == totalBidThisRound && 
+              game.indexOfCurrentPlayer == game.onlinePlayers.length - 1  
+              ? game.newRound() : nextPlayer();
       broadcastPlayersUpdated();
       broadcastStateOfPlay();
       callback('success');

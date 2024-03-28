@@ -1,32 +1,41 @@
-import axios from "axios";
-import { log } from "node:console";
-
 class Deck {
     constructor(){
-        this.success = null;
-        this.deck_id = "new";
-        this.shuffled = null;
-        this.remaining = 0;
+        this.deck = [];
+        this.availableCards = [];
+        this.getDeck();
     }
-    
-    async newDeck(){
-        var newDeck = await fetch(`https://www.deckofcardsapi.com/api/deck/${this.deck_id}/shuffle`).then((response) => response.json());
-        
-        this.deck_id = newDeck.deck_id;
-        this.success = newDeck.success;
-        this.shuffled = newDeck.shuffled;
-        this.remaining = newDeck.remaining;
+
+    async getDeck(){
+        const response = await fetch(`https://www.deckofcardsapi.com/api/deck/new/draw/?count=52`);
+        const data = await response.json();
+        this.deck = data.cards;
+        this.availableCards = this.shuffleDeck();
         return this;
     }
     
-    async drawCards(numberOfCards){
-        const cardsDrawn = await fetch(`https://www.deckofcardsapi.com/api/deck/${this.deck_id}/draw/?count=${numberOfCards}`).then((response) => response.json());
-        if(cardsDrawn.success){
-            this.remaining = cardsDrawn.remaining;
-            return cardsDrawn.cards; //returns an array
+    shuffleDeck(){
+        this.availableCards = this.deck;
+        if(this.deck.length == 52){
+            for(let i = this.availableCards.length -1 ; i > 0; i--){
+                let j = Math.floor(Math.random() * (i+1));
+                let k = this.availableCards[i];
+                this.availableCards[i] = this.availableCards[j];
+                this.availableCards[j] = k;
+            }
         }
-        return "ERROR";
+        return this.availableCards;
     }
-};
+    
+    drawCards(numberOfCards){
+        const cardsDrawn = [];
+        for(let i = 0; i < numberOfCards; i++){
+            let randNum = Math.floor(Math.random() * (this.availableCards.length));
+            let card = this.availableCards[randNum];
+            this.availableCards.splice(randNum,1);
+            cardsDrawn.push(card);
+        }
+        return cardsDrawn;
+    }
+}
 
-export default await Deck;
+export default Deck;

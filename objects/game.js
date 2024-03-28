@@ -13,20 +13,19 @@ class Game{
         this.currentPot = 0;
         this.gameStarted = false;
         this.minimumBet = 50;
-        this.currentRound = -1;
+        this.currentRound = {id: 0, roundNumber: -1};
         this.onlinePlayers = [];
         this.bigBlind = 50;
         this.smallBlind = 25;
     }
 
     async reset(){
-        this.deck = await (this.deck.newDeck());
         this.indexOfCurrentPlayer = null;
         this.indexOfSmallBlindPlayer = null;
         this.indexOfBigBlindPlayer = null;
         this.currentPot = 0;
         this.gameStarted = false;
-        this.currentRound = -2;
+        this.currentRound = {id: 0, roundNumber: -1};
         this.minimumBet = 50;
         this.flop = null;
         this.turn = null;
@@ -40,12 +39,11 @@ class Game{
         return this;
     }
 
-    async newRound(){
+    newRound(){
         if(this.gameStarted){
-            this.currentRound += 1;
-            switch(this.currentRound){
+            this.currentRound.roundNumber += 1;
+            switch(this.currentRound.roundNumber){
                 case 0:
-                    if(this.deck.remaining < 52){this.deck = await (this.deck.newDeck())};
                     this.currentPot = this.bigBlind + this.smallBlind;
                     this.onlinePlayers = this.onlinePlayers.map((player) => {
                         if(player.id == this.onlinePlayers[this.indexOfBigBlindPlayer].id){
@@ -62,16 +60,17 @@ class Game{
                     });
                     return this;
                 case 1:
-                    this.flop = await (this.deck.drawCards(3));
+                    this.flop = this.deck.drawCards(3);
                     return this;
                 case 2: 
-                    this.turn = (await this.deck.drawCards(1))[0];
+                    this.turn = this.deck.drawCards(1)[0];
                     return this;
                 case 3: 
-                    this.river = (await this.deck.drawCards(1))[0];
+                    this.river = this.deck.drawCards(1)[0];
                     return this;
                 default:
-                    this.currentRound = -1;
+                    this.currentRound.roundNumber = -1;
+                    this.currentRound.id += 1;
                     this.flop = null;
                     this.turn = null;
                     this.river = null;
@@ -80,7 +79,8 @@ class Game{
                     this.indexOfCurrentPlayer = 0;
                     this.indexOfSmallBlindPlayer = this.playersJoined.length - 2;
                     this.indexOfBigBlindPlayer = this.playersJoined.length - 1;
-                    await (this.newRound());
+                    this.deck.shuffleDeck();
+                    this.newRound();
                     return this;
             }
         }
